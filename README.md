@@ -4,7 +4,6 @@
 
 
 
-![auto-analyst logo.png](https://github.com/ArslanS1997/Auto-Analyst/blob/main/images/auto-analyst%20logo.png)
 
 
 
@@ -13,7 +12,6 @@
 
 **Auto-Analyst** is an AI-driven data analytics agentic system designed to simplify and enhance the data science process. By integrating various specialized AI agents, this tool aims to make complex data analysis tasks more accessible and efficient for data analysts and scientists. Auto-Analyst provides a streamlined approach to data preprocessing, statistical analysis, machine learning, and visualization, all within an interactive Streamlit interface.
 
-![UI Banner](https://github.com/ArslanS1997/Auto-Analyst/blob/main/images/Auto-Analyst%20Banner.png)
 
 ### Key Features:
 
@@ -63,15 +61,21 @@ You need to set up the `OPENAI_API_KEY` environment variable for the app to func
 Create a file named `.env` in the root of your project and add:
 
 ```plaintext
-OPENAI_API_KEY=your_openai_api_key_here
+GOOGLE_API_KEY=your_openai_api_key_here
 ```
 
 #### Exporting in Terminal:
 ```bash
 export OPENAI_API_KEY=your_openai_api_key_here
 ```
+or
+```bash
+set OPENAI_API_KEY=your_openai_api_key_here
+```
+on Windows.
 
 Replace `your_openai_api_key_here` with your actual OpenAI API key.
+Note that there's no "" wrapping outside of your API key.
 
 ### 4. Run the Streamlit App
 
@@ -116,4 +120,5 @@ The project consists of several key files, each serving a distinct purpose:
 ## License
 
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+
 

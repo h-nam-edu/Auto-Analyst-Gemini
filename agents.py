@@ -1,7 +1,7 @@
 import dspy
-import streamlit as st
-import memory_agents as m
 
+import memory_agents as m
+from  global_state import *
 # Contains the DSPy agents
 
 
@@ -70,7 +70,7 @@ def safe_to_datetime(date):
 df['datetime_column'] = df['datetime_column'].apply(safe_to_datetime)
 
 You will be given recent history as a hint! Use that to infer what the user is saying
-You are logged in streamlit use st.write instead of print
+You are logged in Google Colab use print for logging
 If visualizing use plotly
 
 
@@ -159,7 +159,7 @@ print(result)
 
 
     You may be give recent agent interactions as a hint! With the first being the latest
-    You are logged in streamlit use st.write instead of print
+    You are logged in Google Colab use print for logging
 If visualizing use plotly
 
 
@@ -180,7 +180,7 @@ class sk_learn_agent(dspy.Signature):
     Make sure your output is as intended!
 
     You may be give recent agent interactions as a hint! With the first being the latest
-    You are logged in streamlit use st.write instead of print
+    You are logged in Google Colab use print for logging
 
     
     """
@@ -206,15 +206,21 @@ class code_combiner_agent(dspy.Signature):
 
     Double check column_names/dtypes using dataset, also check if applied logic works for the datatype
     df.copy = df.copy()
-    Change print to st.write
+    
     Also add this to display Plotly chart
-    st.plotly_chart(fig, use_container_width=True)
+    
+    Make sure to import the following "from IPython.display import display"
+
+    
+    To diplay the figure use
+    fig.show()
+    
 
 
 
     Make sure your output is as intended!
         You may be give recent agent interactions as a hint! With the first being the latest
-    You are logged in streamlit use st.write instead of print
+    You are logged in Google Colab use print for logging
 
 
     """
@@ -245,7 +251,7 @@ class data_viz_agent(dspy.Signature):
     You may be give recent agent interactions as a hint! With the first being the latest
     DONT INCLUDE GOAL/DATASET/STYLING INDEX IN YOUR OUTPUT!
     You can add trendline into a scatter plot to show it changes,only if user mentions for it in the query!
-    You are logged in streamlit use st.write instead of print
+    You are logged in Google Colab use print for logging
 
     """
     goal = dspy.InputField(desc="user defined goal which includes information about data and chart they want to plot")
@@ -266,7 +272,7 @@ You are an AI specializing in fixing faulty data analytics code provided by anot
 
 Additional requirements:  
 - Ensure the corrected code performs the intended analysis as described by the user.  
-- Since the environment is Streamlit, use `st.write` instead of `print`.  
+- The environment is Goole colab.  
 - Output **only the corrected code** without any additional explanation or comments.  
 - Ensure the final code runs end-to-end without errors.  
 
@@ -277,187 +283,140 @@ Make your fixes precise and reliable.
     fixed_code= dspy.OutputField(desc="The fixed code")
 
 
-# The ind module is called when agent_name is 
-# explicitly mentioned in the query
+
 class auto_analyst_ind(dspy.Module):
-    # Only doer agents are passed
-    def __init__(self,agents,retrievers):
-        #Initializes all the agents, and makes retrievers
-       
-        #agents stores the DSPy module for each agent
-        # agent_inputs contains all the inputs to use each agent
-        # agent desc contains description on what the agent does 
+    def __init__(self, agents, retrievers):
         self.agents = {}
-        self.agent_inputs ={}
-        self.agent_desc =[]
-        i =0
-        #loops through to create module from agent signatures
-        #creates a dictionary with the exact inputs for agents stored
-        for a in agents:
+        self.agent_inputs = {}
+        self.agent_desc = []
+        
+        for i, a in enumerate(agents):
             name = a.__pydantic_core_schema__['schema']['model_name']
             self.agents[name] = dspy.ChainOfThoughtWithHint(a)
-            self.agent_inputs[name] ={x.strip() for x in str(agents[i].__pydantic_core_schema__['cls']).split('->')[0].split('(')[1].split(',')}
+            self.agent_inputs[name] = {
+                x.strip() for x in str(agents[i].__pydantic_core_schema__['cls']).split('->')[0].split('(')[1].split(',')
+            }
             self.agent_desc.append(str(a.__pydantic_core_schema__['cls']))
-            i+=1
-            
-        # memory_summary agent builds a summary on what the agent does
+
         self.memory_summarize_agent = dspy.ChainOfThought(m.memory_summarize_agent)
-        # two retrievers defined, one dataset and styling index
         self.dataset = retrievers['dataframe_index'].as_retriever(k=1)
         self.styling_index = retrievers['style_index'].as_retriever(similarity_top_k=1)
 
-
     def forward(self, query, specified_agent):
-        
-        # output_dict 
-        dict_ ={}
-        #dict_ is temporary store to be used as input into the agent(s)
-        dict_['dataset'] = self.dataset.retrieve(query)[0].text
-        dict_['styling_index'] = self.styling_index.retrieve(query)[0].text
-        # short_term memory is stored as hint
-        dict_['hint'] = st.session_state.st_memory
-        dict_['goal']=query
-        dict_['Agent_desc'] = str(self.agent_desc)
-        st.write(f"User choose this {specified_agent} to answer this ")
+        print(f"User chose {specified_agent} to answer: {query}")
 
+        inputs_context = {
+            'dataset': self.dataset.retrieve(query)[0].text,
+            'styling_index': self.styling_index.retrieve(query)[0].text,
+            'hint': global_state["st_memory"],
+            'goal': query,
+            'Agent_desc': str(self.agent_desc)
+        }
 
-        inputs = {x:dict_[x] for x in self.agent_inputs[specified_agent.strip()]}
-        # creates the hint to passed into the agent(s)
-        inputs['hint'] = str(dict_['hint']).replace('[','').replace(']','')
-        # output dict stores all the information needed
-        output_dict ={}
-        # input sent to specified_agent
-        output_dict[specified_agent.strip()]=self.agents[specified_agent.strip()](**inputs)
-        # loops through the output Prediction object (converted as dict)
-        for x in dict(output_dict[specified_agent.strip()]).keys():
-            if x!='rationale':
-                st.code(f"{specified_agent.strip()}[{x}]: {str(dict(output_dict[specified_agent.strip()])[x]).replace('#','#######')}")
-                #append in messages for streamlit
-                st.session_state.messages.append(f"{specified_agent.strip()}[{x}]: {str(dict(output_dict[specified_agent.strip()])[x])}")
-        #sends agent output to memory
-        output_dict['memory_'+specified_agent.strip()] = str(self.memory_summarize_agent(agent_response=specified_agent+' '+output_dict[specified_agent.strip()]['code']+'\n'+output_dict[specified_agent.strip()]['commentary'], user_goal=query).summary)
-        # adds agent action summary as memory
-        st.session_state.st_memory.insert(0,f"{'memory_'+specified_agent.strip()} : {output_dict['memory_'+specified_agent.strip()]}")
+        inputs = {x: inputs_context[x] for x in self.agent_inputs[specified_agent.strip()]}
+        inputs['hint'] = str(inputs_context['hint']).replace('[', '').replace(']', '')
 
+        result = self.agents[specified_agent.strip()](**inputs)
+        output_dict = {specified_agent.strip(): result}
+
+        for key, value in dict(result).items():
+            if key != 'rationale':
+                print(f"{specified_agent}[{key}]:\n{value}")
+                global_state["messages"].append(f"{specified_agent}[{key}]: {value}")
+
+        memory_key = f"memory_{specified_agent.strip()}"
+        summary = self.memory_summarize_agent(agent_response=f"{specified_agent} {result.get('code', '')}\n{result.get('commentary', '')}", user_goal=query).summary
+        output_dict[memory_key] = summary
+        global_state["st_memory"].insert(0, f"{memory_key} : {summary}")
 
         return output_dict
 
 
-
-
-
-# This is the auto_analyst with planner
 class auto_analyst(dspy.Module):
-    def __init__(self,agents,retrievers):
-        #Initializes all the agents, and makes retrievers
-       
-        #agents stores the DSPy module for each agent
-        # agent_inputs contains all the inputs to use each agent
-        # agent desc contains description on what the agent does 
-       
-
+    def __init__(self, agents, retrievers):
         self.agents = {}
-        self.agent_inputs ={}
-        self.agent_desc =[]
-        i =0
-        #loops through to create module from agent signatures
-        #creates a dictionary with the exact inputs for agents stored
-        for a in agents:
+        self.agent_inputs = {}
+        self.agent_desc = []
+        
+        for i, a in enumerate(agents):
             name = a.__pydantic_core_schema__['schema']['model_name']
             self.agents[name] = dspy.ChainOfThought(a)
-            self.agent_inputs[name] ={x.strip() for x in str(agents[i].__pydantic_core_schema__['cls']).split('->')[0].split('(')[1].split(',')}
+            self.agent_inputs[name] = {
+                x.strip() for x in str(agents[i].__pydantic_core_schema__['cls']).split('->')[0].split('(')[1].split(',')
+            }
             self.agent_desc.append(str(a.__pydantic_core_schema__['cls']))
-            i+=1
-        
-        # planner agent routes and gives a plan
-        # goal_refine is only sent when query is not routed by the planner
-        # code_combiner agent helps combine different agent output as a single script
+
         self.planner = dspy.ChainOfThought(analytical_planner)
         self.refine_goal = dspy.ChainOfThought(goal_refiner_agent)
         self.code_combiner_agent = dspy.ChainOfThought(code_combiner_agent)
         self.story_teller = dspy.ChainOfThought(story_teller_agent)
         self.memory_summarize_agent = dspy.ChainOfThought(m.memory_summarize_agent)
-                
-        # two retrievers defined, one dataset and styling index
+
         self.dataset = retrievers['dataframe_index'].as_retriever(k=1)
         self.styling_index = retrievers['style_index'].as_retriever(similarity_top_k=1)
-        
+
     def forward(self, query):
-        dict_ ={}
-        
-        # output_dict 
-        dict_ ={}
-        #dict_ is temporary store to be used as input into the agent(s)
-        dict_['dataset'] = self.dataset.retrieve(query)[0].text
-        dict_['styling_index'] = self.styling_index.retrieve(query)[0].text
-        # short_term memory is stored as hint
-        dict_['hint'] = st.session_state.st_memory
-        dict_['goal']=query
-        dict_['Agent_desc'] = str(self.agent_desc)
-        #percent complete is just a streamlit component
-        percent_complete =0
-        # output dict stores all the information needed
+        context = {
+            'dataset': self.dataset.retrieve(query)[0].text,
+            'styling_index': self.styling_index.retrieve(query)[0].text,
+            'hint': global_state["st_memory"],
+            'goal': query,
+            'Agent_desc': str(self.agent_desc)
+        }
 
-        output_dict ={}
-        #tracks the progress
-        my_bar = st.progress(0, text="**Planner Agent Working on devising a plan**")
-        # sends the query to the planner agent to come up with a plan
-        plan = self.planner(goal =dict_['goal'], dataset=dict_['dataset'], Agent_desc=dict_['Agent_desc'] )
-        st.write("**This is the proposed plan**")
-        st.session_state.messages.append(f"planner['plan']: {plan['plan']}")
-        st.session_state.messages.append(f"planner['plan_desc']: {plan['plan_desc']}")
+        print("Planner Agent is working on devising a plan...")
 
-        len_ = len(plan.plan.split('->'))+2
-        percent_complete += 1/len_
-        my_bar.progress(percent_complete, text=" Delegating to Agents")
+        plan = self.planner(goal=context['goal'], dataset=context['dataset'], Agent_desc=context['Agent_desc'])
 
+        print("\n**This is the proposed plan**")
+        print(f"Plan: {plan['plan']}")
+        print(f"Plan Description: {plan['plan_desc']}")
 
+        output_dict={}
         output_dict['analytical_planner'] = plan
         plan_list =[]
         code_list =[]
+        messages=global_state['messages']
+        st_memory=global_state['st_memory']
         analysis_list = [plan.plan,plan.plan_desc]
         #splits the plan and shows it to the user
         if plan.plan.split('->'):
             plan_text = plan.plan
             plan_text = plan.plan.replace('Plan','').replace(':','').strip()
-            st.write(plan_text)
-            st.write(plan.plan_desc)
+            print(plan_text)
+            print(plan.plan_desc)
             plan_list = plan_text.split('->')
         else:
             # if the planner agent fails at routing the query to any agent this is triggered
             refined_goal = self.refine_goal(dataset=dict_['dataset'], goal=dict_['goal'], Agent_desc= dict_['Agent_desc'])
-            st.session_state.messages.append(f"refined_goal: {refined_goal.refined_goal}")
+            messages.append(f"refined_goal: {refined_goal.refined_goal}")
 
             self.forward(query=refined_goal.refined_goal)
        #Loops through all of the agents in the plan
         for p in plan_list:
             # fetches the inputs
-            inputs = {x:dict_[x] for x in self.agent_inputs[p.strip()]}
+            print(p)
+            inputs = {x:context[x] for x in self.agent_inputs[p.strip()]}
             output_dict[p.strip()]=self.agents[p.strip()](**inputs)
             code = output_dict[p.strip()].code
             
             # st.write("This is the generated Code"+ code)
             commentary = output_dict[p.strip()].commentary
-            st.write('**'+p.strip().capitalize().replace('_','  ')+' -  is working on this analysis....**')
-            st.session_state.messages.append(f"{p.strip()}['code']: {output_dict[p.strip()].code}")
-            st.session_state.messages.append(f"{p.strip()}['commentary']: {output_dict[p.strip()].commentary}")
+            print('**'+p.strip().capitalize().replace('_','  ')+' -  is working on this analysis....**')
+            messages.append(f"{p.strip()}['code']: {output_dict[p.strip()].code}")
+            messages.append(f"{p.strip()}['commentary']: {output_dict[p.strip()].commentary}")
 
 
-            st.write(commentary.replace('#',''))
-            st.code(code)
-            percent_complete += 1/len_
-            my_bar.progress(percent_complete)
+            print(commentary.replace('#',''))
+            print(code)
             # stores each of the individual agents code and commentary into seperate lists
             code_list.append(code)
             analysis_list.append(commentary)
-        st.write("Combining all code into one")
-        output_dict['code_combiner_agent'] = self.code_combiner_agent(agent_code_list = str(code_list), dataset=dict_['dataset'])
-        st.session_state.messages.append(f"code_combiner_agent: {output_dict['code_combiner_agent']}")
-        my_bar.progress(percent_complete + 1/len_, text=" Combining WorkFlow")
+            print("Combining all code into one")
+            output_dict['code_combiner_agent'] = self.code_combiner_agent(agent_code_list = str(code_list), dataset=context['dataset'])
+            messages.append(f"code_combiner_agent: {output_dict['code_combiner_agent']}")
+            output_dict['memory_combined'] = str(self.memory_summarize_agent(agent_response='code_combiner_agent'+'\n'+str(output_dict['code_combiner_agent'].refined_complete_code), user_goal=query).summary)
+            st_memory.insert(0,f"{'memory_combined'} : {output_dict['memory_combined']}")
 
-        my_bar.progress(100, text=" Compiling the story")
-        # creates a summary from code_combiner agent
-        output_dict['memory_combined'] = str(self.memory_summarize_agent(agent_response='code_combiner_agent'+'\n'+str(output_dict['code_combiner_agent'].refined_complete_code), user_goal=query).summary)
-        st.session_state.st_memory.insert(0,f"{'memory_combined'} : {output_dict['memory_combined']}")
-
-        return output_dict
+            return output_dict
+        

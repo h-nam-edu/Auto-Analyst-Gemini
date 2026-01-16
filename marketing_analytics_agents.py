@@ -20,7 +20,7 @@ class bidding_strategy_agent(dspy.Signature):
     Make sure your output is as intended!
 
     You may be given recent agent interactions as a hint! With the first being the latest
-    You are logged in streamlit use st.write instead of print
+    You are logged in Google Colab
     
     """
     dataset = dspy.InputField(desc="Available datasets loaded in the system, use this df,columns. set df as copy of df")
@@ -38,8 +38,14 @@ class marketing_reporting_agent(dspy.Signature):
 
     Make sure your output matches the report instructions and goal!
 
-    You are logged in streamlit use st.write instead of print
-    Use st.plotly_chart() for interactive plots
+    You are logged in Goolge Colab.
+    Make sure to import the following "from IPython.display import display"
+
+    
+    To diplay the figure use
+    fig.show()
+    
+
     """
     dataset = dspy.InputField(desc="Available datasets loaded in the system, use this df,columns. set df as copy of df")
     goal = dspy.InputField(desc="The user defined goal")
@@ -66,7 +72,7 @@ class customer_analytics_agent(dspy.Signature):
     Make sure your output is as intended!
 
     You may be given recent agent interactions as a hint! With the first being the latest
-    You are logged in streamlit use st.write instead of print
+    You are logged in Google Colab.
     
     """
     dataset = dspy.InputField(desc="Available datasets loaded in the system, use this df,columns. set df as copy of df")

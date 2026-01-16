@@ -17,6 +17,7 @@ import contextlib
 import sys
 import plotly as px
 import matplotlib.pyplot as plt
+from llama_index.embeddings.google_genai import GoogleGenAIEmbedding
 def reset_everything():
     st.cache_data.clear()
 
@@ -56,12 +57,33 @@ st.markdown("""
 agent_names= [data_viz_agent,sk_learn_agent,statistical_analytics_agent,preprocessing_agent]
 # Configure the LLM to be ChatGPT-4o-mini
 # You can change this to use your particular choice of LLM
-dspy.configure(lm = dspy.OpenAI(model='gpt-4o-mini',api_key=os.environ['OPENAI_API_KEY'], max_tokens=16384))
 
-# dspy.configure(lm =dspy.GROQ(model='llama3-70b-8192', api_key =os.environ.get("GROQ_API_KEY"),max_tokens=10000 ) )
+# Configure the LLM to be Google Gemini
+# Ensure GOOGLE_API_KEY is in your .env file
+# Update your imports if needed
+import dspy
+import os
 
-# sets the embedding model to be used as OpenAI default
-Settings.embed_model = OpenAIEmbedding(api_key=os.environ["OPENAI_API_KEY"])
+# Configure Gemini with Safety Filters turned OFF
+gemini_lm = dspy.Google(
+    model='models/gemini-flash-latest',
+    api_key=os.environ['GOOGLE_API_KEY'],
+    # This block disables the safety checks causing the empty response
+    safety_settings=[
+        {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+        {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+        {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+        {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+    ]
+)
+
+dspy.configure(lm=gemini_lm)
+
+# sets the embedding model to be used as Google default
+Settings.embed_model = GoogleGenAIEmbedding(
+    model_name="models/text-embedding-004", # or "models/embedding-001"
+    api_key=os.environ["GOOGLE_API_KEY"]
+)
 
 # Imports images
 st.image('./images/Auto-analysts icon small.png', width=70)
